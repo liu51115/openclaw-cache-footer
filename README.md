@@ -30,8 +30,12 @@ Then enable the plugin in your OpenClaw config.
 
 The plugin registers two hooks:
 
-1. **`llm_output`** — captures usage stats (input tokens, cache read/write, model info) from each LLM response
-2. **`message_sending`** — appends the formatted footer to the next outgoing message, consuming the captured stats
+1. **`llm_output`** — captures usage stats (input tokens, cache read/write, model info) from each LLM response, keyed by `accountId` extracted from the session
+2. **`message_sending`** — appends the formatted footer to the next outgoing message for the matching account, consuming the captured stats
+
+**Per-account keying** — usage entries are stored per `accountId`, preventing cross-talk when multiple agents run concurrently under different accounts.
+
+**Model routing label** — the footer shows provider and model in friendly form (e.g. `Anthropic · Opus 4.6`, `OR · Sonnet 4.5`). OpenRouter-routed models display with the `OR` prefix.
 
 Usage data expires after 30 seconds to avoid stale footers.
 
