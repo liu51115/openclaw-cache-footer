@@ -1,5 +1,5 @@
 /**
- * Cache Footer Plugin v0.8.0
+ * Cache Footer Plugin v0.8.1
  * Appends prompt cache hit stats to every agent response.
  *
  * Strategy: llm_output (void hook) captures usage keyed by accountId,
@@ -118,13 +118,30 @@ export default definePluginEntry({
         modelId: model,
         ts: Date.now(),
       });
-      api.logger.info(`[cache-footer] Captured usage for ${accountId}: input=${usage.input} cacheRead=${usage.cacheRead ?? 0} route=${route}`);
+      api.logger.info(`[cache-footer] Captured usage for ${accountId}: input=${usage.input} cacheRead=${usage.cacheRead ?? 0} cacheWrite=${usage.cacheWrite ?? 0} output=${usage.output ?? 0} route=${route}`);
     });
 
     // Append footer to outgoing messages, matched by accountId
     api.on("message_sending", (event: any, ctx: any) => {
-      const accountId: string = ctx?.accountId ?? "_default";
-      const entry = usageByAccount.get(accountId);
+      const rawAccountId: string = ctx?.accountId ?? "_default";
+      // Try direct match first, then fall back to most recent entry within staleness window
+      let accountId = rawAccountId;
+      let entry = usageByAccount.get(accountId);
+      if (!entry && (rawAccountId === "_default" || rawAccountId === "default")) {
+        // ctx.accountId missing or generic — find the most recent entry
+        let bestKey: string | undefined;
+        let bestTs = 0;
+        for (const [key, val] of usageByAccount.entries()) {
+          if (val.ts > bestTs && (Date.now() - val.ts) < STALENESS_MS) {
+            bestTs = val.ts;
+            bestKey = key;
+          }
+        }
+        if (bestKey) {
+          accountId = bestKey;
+          entry = usageByAccount.get(bestKey);
+        }
+      }
       if (!entry) return;
 
       // Staleness guard

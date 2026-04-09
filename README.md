@@ -45,11 +45,21 @@ The plugin registers two hooks:
 1. **`llm_output`** (void hook) — captures usage stats (input tokens, cache read/write, model, provider) from each LLM response, keyed by `accountId`
 2. **`message_sending`** (modifying hook) — appends the formatted footer to the next outgoing message for the matching account
 
+## Pricing sources
+
+Cost estimates come from two sources:
+
+1. **OpenRouter models** — pulled dynamically from OpenClaw's model registry (which fetches from OpenRouter's API). These auto-update when OpenRouter changes prices. No manual action needed.
+
+2. **Direct Anthropic models** — looked up from `pricing.json` in this plugin directory. This file is **manually maintained** and must be updated by hand when Anthropic changes their pricing. The `_source` field in the file links to Anthropic's official pricing page for reference.
+
+The plugin tries the model registry first. If no match is found (typical for direct Anthropic API calls that bypass OpenRouter), it falls back to `pricing.json`.
+
 ## Configuration
 
 No configuration required. Works out of the box.
 
-To update Anthropic pricing, edit `pricing.json` (rates in $ per million tokens).
+To update Anthropic pricing, edit `pricing.json` (rates in $/MTok).
 
 ## License
 
