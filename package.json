@@ -1,0 +1,14 @@
+{
+  "name": "cache-footer",
+  "version": "0.3.0",
+  "type": "module",
+  "main": "index.ts",
+  "openclaw": {
+    "extensions": ["./index.ts"]
+  },
+  "description": "OpenClaw plugin that appends cache hit rate to agent responses",
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0"
+  }
+}
