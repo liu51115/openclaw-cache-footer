@@ -1,0 +1,9 @@
+{
+  "_source": "https://platform.claude.com/docs/en/about-claude/pricing",
+  "_updated": "2026-04-09",
+  "claude-opus-4-6":   { "input": 5,  "cacheRead": 0.50, "cacheWrite": 6.25,  "output": 25 },
+  "claude-opus-4-5":   { "input": 5,  "cacheRead": 0.50, "cacheWrite": 6.25,  "output": 25 },
+  "claude-sonnet-4-6": { "input": 3,  "cacheRead": 0.30, "cacheWrite": 3.75,  "output": 15 },
+  "claude-sonnet-4-5": { "input": 3,  "cacheRead": 0.30, "cacheWrite": 3.75,  "output": 15 },
+  "claude-haiku-4-5":  { "input": 1,  "cacheRead": 0.10, "cacheWrite": 1.25,  "output": 5  }
+}

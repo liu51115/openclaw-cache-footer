@@ -2,7 +2,7 @@
   "id": "cache-footer",
   "name": "Cache Footer",
   "description": "Appends prompt cache hit stats to agent responses",
-  "version": "0.5.0",
+  "version": "0.8.0",
   "entry": "index.ts",
   "configSchema": {
     "type": "object",

@@ -1,5 +1,5 @@
 /**
- * Cache Footer Plugin v0.5.0
+ * Cache Footer Plugin v0.8.0
  * Appends prompt cache hit stats to every agent response.
  *
  * Strategy: llm_output (void hook) captures usage keyed by accountId,
@@ -7,14 +7,47 @@
  * Keyed by accountId to prevent cross-talk between concurrent agents.
  */
 import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
+import { readFileSync } from "fs";
+import { join, dirname } from "path";
+import { fileURLToPath } from "url";
 
 interface UsageEntry {
   input: number;
   cacheRead: number;
   cacheWrite: number;
+  output: number;
   model: string;
+  provider: string;
+  modelId: string;
   ts: number;
 }
+
+/** Load fallback pricing from pricing.json (easy to maintain separately) */
+function loadFallbackPricing(): Record<string, { input: number; cacheRead: number; cacheWrite: number; output: number }> {
+  try {
+    const dir = dirname(fileURLToPath(import.meta.url));
+    const raw = readFileSync(join(dir, "pricing.json"), "utf-8");
+    const data = JSON.parse(raw);
+    // Filter out metadata keys starting with _
+    const pricing: Record<string, any> = {};
+    for (const [k, v] of Object.entries(data)) {
+      if (!k.startsWith("_") && typeof v === "object") pricing[k] = v;
+    }
+    return pricing;
+  } catch {
+    return {};
+  }
+}
+
+const FALLBACK_PRICING = loadFallbackPricing();
+
+function formatCost(cost: number): string {
+  if (cost < 0.001) return "<$0.001";
+  if (cost < 0.01) return `$${cost.toFixed(3)}`;
+  return `$${cost.toFixed(2)}`;
+}
+
+
 
 /** Usage entries keyed by accountId to prevent cross-agent contamination */
 const usageByAccount = new Map<string, UsageEntry>();
@@ -79,7 +112,10 @@ export default definePluginEntry({
         input: usage.input ?? 0,
         cacheRead: usage.cacheRead ?? 0,
         cacheWrite: usage.cacheWrite ?? 0,
+        output: usage.output ?? 0,
         model: route,
+        provider,
+        modelId: model,
         ts: Date.now(),
       });
       api.logger.info(`[cache-footer] Captured usage for ${accountId}: input=${usage.input} cacheRead=${usage.cacheRead ?? 0} route=${route}`);
@@ -99,7 +135,8 @@ export default definePluginEntry({
       }
 
       const { input, cacheRead, cacheWrite, model } = entry;
-      usageByAccount.delete(accountId); // consume once per accountId
+      // Don't delete — let 30s staleness guard handle cleanup.
+      // Deleting breaks split messages (multi-chunk Telegram).
 
       const total = input + cacheRead;
       if (total <= 0) return;
@@ -107,6 +144,22 @@ export default definePluginEntry({
       const pct = Math.round((cacheRead / total) * 100);
       const fmtParts = [`${pct}%`, `${formatK(cacheRead)}/${formatK(total)}`];
       if (cacheWrite > 0) fmtParts.push(`+${formatK(cacheWrite)} new`);
+
+      // Cost: try OC model registry first (OpenRouter), fall back to hardcoded Anthropic
+      const registryModel = api.modelRegistry?.find?.(entry.provider, entry.modelId);
+      let pricing = (registryModel as any)?.cost;
+      if (!pricing || (pricing.input === 0 && pricing.output === 0)) {
+        const slug = (entry.modelId.split("/").pop() ?? "").replace(/-\d{8}$/, "");
+        pricing = FALLBACK_PRICING[slug];
+      }
+      if (pricing) {
+        const cost =
+          (entry.input * (pricing.input ?? 0) +
+           entry.cacheRead * (pricing.cacheRead ?? 0) +
+           entry.cacheWrite * (pricing.cacheWrite ?? 0) +
+           entry.output * (pricing.output ?? 0)) / 1_000_000;
+        if (cost > 0) fmtParts.push(formatCost(cost));
+      }
 
       if (model) fmtParts.push(model);
       const footer = `\n📊 ${fmtParts.join(" · ")}`;
