@@ -127,8 +127,11 @@ export default definePluginEntry({
       // Try direct match first, then fall back to most recent entry within staleness window
       let accountId = rawAccountId;
       let entry = usageByAccount.get(accountId);
-      if (!entry && (rawAccountId === "_default" || rawAccountId === "default")) {
-        // ctx.accountId missing or generic — find the most recent entry
+      if (!entry) {
+        // No direct match — find the most recent entry within staleness window.
+        // Handles: _default/default fallback, AND name mismatches where
+        // llm_output keys by agent name (e.g. "nash") but message_sending
+        // keys by telegram account name (e.g. "recovery").
         let bestKey: string | undefined;
         let bestTs = 0;
         for (const [key, val] of usageByAccount.entries()) {
@@ -167,7 +170,8 @@ export default definePluginEntry({
       let pricing = (registryModel as any)?.cost;
       if (!pricing || (pricing.input === 0 && pricing.output === 0)) {
         const slug = (entry.modelId.split("/").pop() ?? "").replace(/-\d{8}$/, "");
-        pricing = FALLBACK_PRICING[slug];
+        // Normalize dots to hyphens for OR model IDs (claude-opus-4.6 → claude-opus-4-6)
+        pricing = FALLBACK_PRICING[slug] ?? FALLBACK_PRICING[slug.replace(/\./g, "-")];
       }
       if (pricing) {
         const cost =
